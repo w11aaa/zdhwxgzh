@@ -291,6 +291,12 @@ def _build_gongkao_wechat_content(event: GongkaoSelection, *, include_attachment
         lines.append("")
         lines.append(registration_method)
         lines.append("")
+    audience_hint = _build_audience_hint(event)
+    if audience_hint:
+        lines.append("## 适合人群提醒")
+        lines.append("")
+        lines.append(audience_hint)
+        lines.append("")
     lines.append("## 公告要点")
     lines.append("")
     lines.extend(_build_summary_paragraphs(event))
@@ -318,6 +324,12 @@ def _build_origin_first_content(event: GongkaoSelection, *, include_attachment_i
     body_parts: list[str] = []
     body_parts.append("原文链接已放在文章最后，方便需要查看完整公告的同学核对。")
     body_parts.append("")
+    audience_hint = _build_audience_hint(event)
+    if audience_hint:
+        body_parts.append("## 适合人群提醒")
+        body_parts.append("")
+        body_parts.append(audience_hint)
+        body_parts.append("")
     body_parts.append(_strip_source_noise(_html_to_plain_text(event.source_origin_html)))
     if include_attachment_images:
         attachment_block = "\n".join(_build_attachment_image_markdown(event)).strip()
@@ -329,6 +341,67 @@ def _build_origin_first_content(event: GongkaoSelection, *, include_attachment_i
     body_parts.append(event.source_origin_url)
     body_parts.append("")
     return title, "\n".join(part for part in body_parts if part is not None).strip() + "\n"
+
+
+def _build_audience_hint(event: GongkaoSelection) -> str:
+    """根据学历、专业、类型和招聘规模生成适合人群提醒。"""
+    hints: list[str] = []
+
+    qualification = str(event.qualification or "").strip()
+    major = str(event.major_requirements or "").strip()
+    category = str(event.category or "").strip()
+    job_count = event.job_count
+
+    # 学历门槛
+    if qualification:
+        if any(kw in qualification for kw in ["博士", "硕士", "研究生"]):
+            hints.append(f"学历要求为「{qualification}」，适合具备相应学位的考生关注。")
+        elif "专科" in qualification or "大专" in qualification:
+            hints.append(f"学历要求为「{qualification}」，门槛相对较低，符合条件的朋友可重点关注。")
+        elif "本科" in qualification:
+            hints.append(f"学历要求为「{qualification}」，本科学历的同学可报。")
+        else:
+            hints.append(f"学历要求：{qualification}，请核对自身学历是否匹配。")
+
+    # 专业要求
+    if major:
+        if "不限" in major or "专业不限" in major:
+            hints.append("专业不限，所有专业背景的考生均可报名。")
+        elif any(kw in major for kw in ["计算机", "软件", "信息", "数据", "人工智能"]):
+            hints.append(f"专业方向涵盖「{major}」，计算机/信息技术类专业的同学可重点关注。")
+        else:
+            hints.append(f"专业要求：{major}，相关专业背景的考生优先。")
+
+    # 考试类型与人群匹配
+    category_hints = {
+        "公务员": "适合有志于进入政府机关工作的考生。",
+        "事业单位": "事业单位编制稳定，适合追求工作生活平衡的考生。",
+        "教师": "适合持有教师资格证或教育相关背景的考生。",
+        "国企": "国企岗位待遇优厚，适合追求稳定发展的求职者。",
+        "医疗": "适合医学、护理等相关专业的医疗卫生人才。",
+        "选调": "面向优秀应届毕业生，适合有学生干部经历的在校生提前规划。",
+        "军队文职": "适合有意向进入军队系统从事文职工作的考生。",
+        "三支一扶": "适合愿意到基层服务的高校毕业生，服务期满有加分政策。",
+    }
+    for key, hint_text in category_hints.items():
+        if key in category:
+            hints.append(hint_text)
+            break
+
+    # 规模提示
+    if job_count is not None:
+        if job_count >= 100:
+            hints.append(f"本次招聘规模较大（{job_count}人），竞争相对分散，上岸机会较多。")
+        elif job_count >= 30:
+            hints.append(f"招聘{job_count}人，规模不错，值得投入时间准备。")
+        elif job_count > 0:
+            hints.append(f"招聘{job_count}人，名额有限，建议尽早报名抢占先机。")
+
+    if not hints:
+        return ""
+
+    # 用项目符号输出，最多 4 条
+    return "\n".join(f"- {h}" for h in hints[:4])
 
 
 def _build_attachment_image_markdown(event: GongkaoSelection) -> list[str]:
