@@ -1,0 +1,708 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>小红书AI发布器</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            font-weight: 700;
+        }
+
+        .header p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+
+        .content {
+            padding: 40px;
+        }
+
+        .step {
+            margin-bottom: 40px;
+            padding: 30px;
+            border: 2px solid #f1f3f4;
+            border-radius: 15px;
+            transition: all 0.3s ease;
+        }
+
+        .step:hover {
+            border-color: #667eea;
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+
+        .step-title {
+            font-size: 1.4rem;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+        }
+
+        .step-number {
+            background: #667eea;
+            color: white;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 15px;
+            font-weight: bold;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #555;
+            font-weight: 500;
+        }
+
+        input, textarea, select {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid #e1e5e9;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s ease;
+        }
+
+        input:focus, textarea:focus, select:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        textarea {
+            resize: vertical;
+            min-height: 120px;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, #00b894 0%, #00a085 100%);
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, #e17055 0%, #d63031 100%);
+        }
+
+        .file-upload {
+            border: 2px dashed #ccc;
+            border-radius: 8px;
+            padding: 40px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .file-upload:hover {
+            border-color: #667eea;
+            background: #f8f9ff;
+        }
+
+        .file-upload.dragover {
+            border-color: #667eea;
+            background: #f0f4ff;
+        }
+
+        .status {
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+            font-weight: 500;
+        }
+
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .status.info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 2px solid #ffffff;
+            border-radius: 50%;
+            border-top-color: transparent;
+            animation: spin 1s ease-in-out infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .image-preview {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-top: 15px;
+        }
+
+        .image-preview img {
+            width: 100px;
+            height: 100px;
+            object-fit: cover;
+            border-radius: 8px;
+            border: 2px solid #e1e5e9;
+        }
+
+        .session-info {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 14px;
+            color: #6c757d;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                margin: 10px;
+                border-radius: 15px;
+            }
+            
+            .content {
+                padding: 20px;
+            }
+            
+            .header h1 {
+                font-size: 2rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🌸 小红书AI发布器</h1>
+            <p>智能化内容发布，让创作更简单</p>
+        </div>
+
+        <div class="content">
+            <!-- 会话信息 -->
+            <div id="sessionInfo" class="session-info hidden">
+                <strong>会话ID:</strong> <span id="sessionId">-</span><br>
+                <strong>登录状态:</strong> <span id="loginStatus">未登录</span>
+            </div>
+
+            <!-- 步骤1: 登录 -->
+            <div class="step">
+                <div class="step-title">
+                    <span class="step-number">1</span>
+                    登录小红书账号
+                </div>
+                
+                <div class="form-group">
+                    <label for="phone">手机号码</label>
+                    <input type="tel" id="phone" placeholder="请输入手机号码" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="countryCode">国家代码</label>
+                    <select id="countryCode">
+                        <option value="+86">+86 (中国大陆)</option>
+                        <option value="+852">+852 (香港)</option>
+                        <option value="+853">+853 (澳门)</option>
+                        <option value="+886">+886 (台湾)</option>
+                    </select>
+                </div>
+
+                <button id="loginBtn" class="btn">
+                    <span id="loginBtnText">发送验证码</span>
+                    <div id="loginLoading" class="loading hidden"></div>
+                </button>
+
+                <!-- 验证码输入区域 -->
+                <div id="verificationArea" class="hidden" style="margin-top: 20px;">
+                    <div class="form-group">
+                        <label for="verificationCode">验证码</label>
+                        <input type="text" id="verificationCode" placeholder="请输入收到的验证码" maxlength="6">
+                    </div>
+                    <button id="verifyBtn" class="btn btn-success">
+                        <span id="verifyBtnText">确认登录</span>
+                        <div id="verifyLoading" class="loading hidden"></div>
+                    </button>
+                </div>
+
+                <div id="loginMessage" class="status hidden"></div>
+            </div>
+
+            <!-- 步骤2: 上传图片 -->
+            <div class="step">
+                <div class="step-title">
+                    <span class="step-number">2</span>
+                    上传图片 (可选)
+                </div>
+
+                <div class="file-upload" id="fileUpload">
+                    <div>
+                        <p style="font-size: 1.2rem; margin-bottom: 10px;">📸 拖拽图片到这里或点击选择</p>
+                        <p style="color: #666;">支持 JPG、PNG、GIF 格式，最多9张图片</p>
+                    </div>
+                    <input type="file" id="fileInput" multiple accept="image/*" style="display: none;">
+                </div>
+
+                <div id="imagePreview" class="image-preview"></div>
+                <div id="uploadMessage" class="status hidden"></div>
+            </div>
+
+            <!-- 步骤3: 编写内容 -->
+            <div class="step">
+                <div class="step-title">
+                    <span class="step-number">3</span>
+                    编写笔记内容
+                </div>
+
+                <div class="form-group">
+                    <label for="title">标题</label>
+                    <input type="text" id="title" placeholder="请输入笔记标题" maxlength="100">
+                </div>
+
+                <div class="form-group">
+                    <label for="content">正文内容</label>
+                    <textarea id="content" placeholder="分享你的精彩内容..." maxlength="1000"></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="autoPublish" style="width: auto; margin-right: 8px;">
+                        自动发布 (取消勾选则需要手动确认发布)
+                    </label>
+                </div>
+            </div>
+
+            <!-- 步骤4: 发布 -->
+            <div class="step">
+                <div class="step-title">
+                    <span class="step-number">4</span>
+                    发布笔记
+                </div>
+
+                <button id="publishBtn" class="btn" style="font-size: 1.1rem; padding: 15px 30px;">
+                    <span id="publishBtnText">🚀 发布到小红书</span>
+                    <div id="publishLoading" class="loading hidden"></div>
+                </button>
+
+                <div id="publishMessage" class="status hidden"></div>
+            </div>
+
+            <!-- 会话管理 -->
+            <div class="step">
+                <div class="step-title">
+                    <span class="step-number">⚙️</span>
+                    会话管理
+                </div>
+
+                <button id="closeSessionBtn" class="btn btn-danger">
+                    关闭当前会话
+                </button>
+
+                <button id="refreshStatusBtn" class="btn" style="margin-left: 10px;">
+                    刷新状态
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        class XiaohongshuPublisher {
+            constructor() {
+                this.sessionId = null;
+                this.uploadedFiles = [];
+                this.init();
+            }
+
+            init() {
+                this.bindEvents();
+            }
+
+            bindEvents() {
+                // 登录相关
+                document.getElementById('loginBtn').addEventListener('click', () => this.login());
+                document.getElementById('verifyBtn').addEventListener('click', () => this.verifyCode());
+
+                // 文件上传相关
+                const fileUpload = document.getElementById('fileUpload');
+                const fileInput = document.getElementById('fileInput');
+
+                fileUpload.addEventListener('click', () => fileInput.click());
+                fileUpload.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    fileUpload.classList.add('dragover');
+                });
+                fileUpload.addEventListener('dragleave', () => {
+                    fileUpload.classList.remove('dragover');
+                });
+                fileUpload.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    fileUpload.classList.remove('dragover');
+                    this.handleFiles(e.dataTransfer.files);
+                });
+
+                fileInput.addEventListener('change', (e) => {
+                    this.handleFiles(e.target.files);
+                });
+
+                // 发布相关
+                document.getElementById('publishBtn').addEventListener('click', () => this.publish());
+
+                // 会话管理
+                document.getElementById('closeSessionBtn').addEventListener('click', () => this.closeSession());
+                document.getElementById('refreshStatusBtn').addEventListener('click', () => this.refreshStatus());
+            }
+
+            async login() {
+                const phone = document.getElementById('phone').value.trim();
+                const countryCode = document.getElementById('countryCode').value;
+
+                if (!phone) {
+                    this.showMessage('loginMessage', '请输入手机号码', 'error');
+                    return;
+                }
+
+                this.setLoading('loginBtn', true);
+
+                try {
+                    const response = await fetch('/api/auth/login', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ phone, country_code: countryCode })
+                    });
+
+                    const data = await response.json();
+
+                    if (response.ok) {
+                        this.sessionId = data.session_id;
+                        this.showSessionInfo();
+                        this.showMessage('loginMessage', data.message, 'success');
+                        document.getElementById('verificationArea').classList.remove('hidden');
+                        document.getElementById('loginBtn').disabled = true;
+                    } else {
+                        this.showMessage('loginMessage', data.detail || '登录失败', 'error');
+                    }
+                } catch (error) {
+                    this.showMessage('loginMessage', '网络错误，请重试', 'error');
+                    console.error('Login error:', error);
+                } finally {
+                    this.setLoading('loginBtn', false);
+                }
+            }
+
+            async verifyCode() {
+                const code = document.getElementById('verificationCode').value.trim();
+
+                if (!code) {
+                    this.showMessage('loginMessage', '请输入验证码', 'error');
+                    return;
+                }
+
+                if (!this.sessionId) {
+                    this.showMessage('loginMessage', '请先发送验证码', 'error');
+                    return;
+                }
+
+                this.setLoading('verifyBtn', true);
+
+                try {
+                    const response = await fetch('/api/auth/verify', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ 
+                            session_id: this.sessionId, 
+                            code: code 
+                        })
+                    });
+
+                    const data = await response.json();
+
+                    if (response.ok && data.logged_in) {
+                        this.showMessage('loginMessage', '登录成功！', 'success');
+                        document.getElementById('verifyBtn').disabled = true;
+                        this.updateLoginStatus('已登录');
+                    } else {
+                        this.showMessage('loginMessage', data.message || '验证失败', 'error');
+                    }
+                } catch (error) {
+                    this.showMessage('loginMessage', '网络错误，请重试', 'error');
+                    console.error('Verify error:', error);
+                } finally {
+                    this.setLoading('verifyBtn', false);
+                }
+            }
+
+            async handleFiles(files) {
+                if (files.length > 9) {
+                    this.showMessage('uploadMessage', '最多只能上传9张图片', 'error');
+                    return;
+                }
+
+                const formData = new FormData();
+                for (let file of files) {
+                    if (!file.type.startsWith('image/')) {
+                        this.showMessage('uploadMessage', '只能上传图片文件', 'error');
+                        return;
+                    }
+                    formData.append('files', file);
+                }
+
+                try {
+                    const response = await fetch('/api/upload', {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    const data = await response.json();
+
+                    if (response.ok) {
+                        this.uploadedFiles = data.files;
+                        this.showMessage('uploadMessage', data.message, 'success');
+                        this.showImagePreview(files);
+                    } else {
+                        this.showMessage('uploadMessage', data.detail || '上传失败', 'error');
+                    }
+                } catch (error) {
+                    this.showMessage('uploadMessage', '上传失败，请重试', 'error');
+                    console.error('Upload error:', error);
+                }
+            }
+
+            showImagePreview(files) {
+                const preview = document.getElementById('imagePreview');
+                preview.innerHTML = '';
+
+                for (let file of files) {
+                    const img = document.createElement('img');
+                    img.src = URL.createObjectURL(file);
+                    preview.appendChild(img);
+                }
+            }
+
+            async publish() {
+                const title = document.getElementById('title').value.trim();
+                const content = document.getElementById('content').value.trim();
+                const autoPublish = document.getElementById('autoPublish').checked;
+
+                if (!title || !content) {
+                    this.showMessage('publishMessage', '请填写标题和内容', 'error');
+                    return;
+                }
+
+                if (!this.sessionId) {
+                    this.showMessage('publishMessage', '请先登录', 'error');
+                    return;
+                }
+
+                this.setLoading('publishBtn', true);
+
+                try {
+                    const response = await fetch('/api/publish', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            session_id: this.sessionId,
+                            title: title,
+                            content: content,
+                            image_files: this.uploadedFiles,
+                            auto_publish: autoPublish
+                        })
+                    });
+
+                    const data = await response.json();
+
+                    if (response.ok) {
+                        this.showMessage('publishMessage', data.message, 'success');
+                        if (!autoPublish) {
+                            this.showMessage('publishMessage', '请在打开的浏览器窗口中完成发布操作', 'info');
+                        }
+                    } else {
+                        this.showMessage('publishMessage', data.detail || '发布失败', 'error');
+                    }
+                } catch (error) {
+                    this.showMessage('publishMessage', '发布失败，请重试', 'error');
+                    console.error('Publish error:', error);
+                } finally {
+                    this.setLoading('publishBtn', false);
+                }
+            }
+
+            async closeSession() {
+                if (!this.sessionId) {
+                    alert('没有活跃的会话');
+                    return;
+                }
+
+                try {
+                    await fetch(`/api/session/${this.sessionId}`, {
+                        method: 'DELETE'
+                    });
+                    
+                    this.sessionId = null;
+                    this.hideSessionInfo();
+                    this.resetForm();
+                    alert('会话已关闭');
+                } catch (error) {
+                    console.error('Close session error:', error);
+                    alert('关闭会话失败');
+                }
+            }
+
+            async refreshStatus() {
+                if (!this.sessionId) {
+                    return;
+                }
+
+                try {
+                    const response = await fetch(`/api/auth/status/${this.sessionId}`);
+                    const data = await response.json();
+
+                    if (response.ok) {
+                        this.updateLoginStatus(data.logged_in ? '已登录' : '未登录');
+                    }
+                } catch (error) {
+                    console.error('Refresh status error:', error);
+                }
+            }
+
+            showSessionInfo() {
+                document.getElementById('sessionInfo').classList.remove('hidden');
+                document.getElementById('sessionId').textContent = this.sessionId;
+            }
+
+            hideSessionInfo() {
+                document.getElementById('sessionInfo').classList.add('hidden');
+            }
+
+            updateLoginStatus(status) {
+                document.getElementById('loginStatus').textContent = status;
+            }
+
+            resetForm() {
+                document.getElementById('phone').value = '';
+                document.getElementById('verificationCode').value = '';
+                document.getElementById('title').value = '';
+                document.getElementById('content').value = '';
+                document.getElementById('autoPublish').checked = false;
+                document.getElementById('verificationArea').classList.add('hidden');
+                document.getElementById('loginBtn').disabled = false;
+                document.getElementById('verifyBtn').disabled = false;
+                document.getElementById('imagePreview').innerHTML = '';
+                this.uploadedFiles = [];
+                
+                // 清除所有消息
+                ['loginMessage', 'uploadMessage', 'publishMessage'].forEach(id => {
+                    document.getElementById(id).classList.add('hidden');
+                });
+            }
+
+            showMessage(elementId, message, type) {
+                const element = document.getElementById(elementId);
+                element.textContent = message;
+                element.className = `status ${type}`;
+                element.classList.remove('hidden');
+            }
+
+            setLoading(buttonId, loading) {
+                const button = document.getElementById(buttonId);
+                const text = document.getElementById(buttonId.replace('Btn', 'BtnText'));
+                const loader = document.getElementById(buttonId.replace('Btn', 'Loading'));
+
+                if (loading) {
+                    button.disabled = true;
+                    text.style.opacity = '0.7';
+                    loader.classList.remove('hidden');
+                } else {
+                    button.disabled = false;
+                    text.style.opacity = '1';
+                    loader.classList.add('hidden');
+                }
+            }
+        }
+
+        // 初始化应用
+        document.addEventListener('DOMContentLoaded', () => {
+            new XiaohongshuPublisher();
+        });
+    </script>
+</body>
+</html> 

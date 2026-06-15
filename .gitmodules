@@ -1,0 +1,6 @@
+[submodule "MediaCrawler"]
+	path = MediaCrawler
+	url = https://github.com/NanmiCoder/MediaCrawler.git
+[submodule "wechat_article_skills"]
+	path = wechat_article_skills
+	url = https://github.com/BND-1/wechat_article_skills.git

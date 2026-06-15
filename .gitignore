@@ -1,0 +1,71 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+*.egg
+.eggs/
+
+# Virtual environments / Conda
+venv/
+.venv/
+env/
+.conda/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Database files (contains real data, do not commit)
+*.db
+*.db-shm
+*.db-wal
+*.sqlite3
+
+# Sensitive API keys
+kaoyan_collector/api.md
+*.env
+!.env.example
+
+# Media / Data outputs (large generated files)
+kaoyan_collector/wechat_outputs/
+kaoyan_collector/drafts/
+kaoyan_collector/attachments/
+kaoyan_collector/quality_reports/
+kaoyan_collector/raw_data/
+
+# Debug / temp files
+debug_*.png
+error_screenshot.png
+tmp_*.py
+tmp_*.html
+kaoyan_collector/dom_dumps/
+kaoyan_collector/发布页源代码.txt
+
+# Node / frontend
+node_modules/
+package-lock.json
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Docker
+docker-compose.override.yml
+
+# Coverage
+.coverage
+htmlcov/
+.pytest_cache/
+
+# Playwright
+.playwright/
