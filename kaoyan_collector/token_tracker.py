@@ -117,3 +117,11 @@ class TokenTracker:
                 "FROM token_usage_log").fetchone()
         return {"calls": row["c"] or 0, "total_tokens": row["t"] or 0,
                 "total_cost": round(row["cost"] or 0, 4)}
+
+    def model_summary(self) -> list[dict]:
+        with self._connect() as conn:
+            rows = conn.execute(
+                "SELECT model, count(*) calls, sum(total_tokens) tokens, "
+                "sum(cost_total) cost FROM token_usage_log "
+                "GROUP BY model ORDER BY cost DESC").fetchall()
+        return [dict(r) for r in rows]
