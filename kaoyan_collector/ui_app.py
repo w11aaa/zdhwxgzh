@@ -2092,6 +2092,62 @@ refreshAll().catch(err => log("初始化失败：" + err.message));
 </html>"""
 
 
+# ── 微信 AI 客服回调处理 ──────────────────────────────────────
+
+def _handle_wechat_callback_get(handler, params):
+    """微信服务器配置验证（GET 请求）。"""
+    from .wechat_ai_service import verify_signature, WECHAT_TOKEN
+    from urllib.parse import parse_qs
+    signature = (params.get("signature") or [""])[0]
+    timestamp = (params.get("timestamp") or [""])[0]
+    nonce = (params.get("nonce") or [""])[0]
+    echostr = (params.get("echostr") or [""])[0]
+
+    if verify_signature(signature, timestamp, nonce, WECHAT_TOKEN):
+        print(f"[wechat] 签名验证成功", flush=True)
+        _text_response(handler, echostr, content_type="text/plain; charset=utf-8")
+    else:
+        print(f"[wechat] 签名验证失败", flush=True)
+        handler.send_response(403)
+        handler.end_headers()
+
+
+def _handle_wechat_callback_post(handler):
+    """处理用户消息推送（POST 请求）。"""
+    from .wechat_ai_service import parse_message, build_text_reply
+
+    content_length = int(handler.headers.get("Content-Length", "0") or 0)
+    raw_body = handler.rfile.read(content_length).decode("utf-8") if content_length > 0 else ""
+
+    print(f"[wechat] 收到消息: {raw_body[:200]}...", flush=True)
+
+    try:
+        msg = parse_message(raw_body)
+        from_user = msg.get("FromUserName", "")
+        to_user = msg.get("ToUserName", "")
+        msg_type = msg.get("MsgType", "text")
+        content = msg.get("Content", "")
+
+        print(f"[wechat] 用户 {from_user} 发送: [{msg_type}] {content[:60]}", flush=True)
+
+        # ── Demo: 固定回复 ──
+        reply_content = "好的，收到"
+        reply_xml = build_text_reply(to_user, from_user, reply_content)
+
+        payload = reply_xml.encode("utf-8")
+        handler.send_response(200)
+        handler.send_header("Content-Type", "application/xml; charset=utf-8")
+        handler.send_header("Content-Length", str(len(payload)))
+        handler.end_headers()
+        handler.wfile.write(payload)
+
+    except Exception as e:
+        print(f"[wechat] 处理失败: {e}", flush=True)
+        handler.send_response(200)
+        handler.end_headers()
+        handler.wfile.write(b"success")
+
+
 class GongkaoUiHandler(BaseHTTPRequestHandler):
     server_version = "GongkaoUi/0.1"
 
@@ -2114,6 +2170,9 @@ class GongkaoUiHandler(BaseHTTPRequestHandler):
             return
         if parsed.path == "/agent/tools":
             _text_response(self, _agent_tools_page_html())
+            return
+        if parsed.path == "/wechat/callback":
+            _handle_wechat_callback_get(self, parse_qs(parsed.query))
             return
         if parsed.path == "/wechat/drafts":
             _text_response(self, _wechat_list_page_html("drafts", parse_qs(parsed.query)))
@@ -2169,6 +2228,10 @@ class GongkaoUiHandler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:
         parsed = urlparse(self.path)
+        # 微信回调 POST（优先处理，不需要 JSON body）
+        if parsed.path == "/wechat/callback":
+            _handle_wechat_callback_post(self)
+            return
         body = _read_json_body(self)
         try:
             if parsed.path == "/api/collect":
