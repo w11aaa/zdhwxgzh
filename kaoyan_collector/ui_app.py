@@ -2213,6 +2213,11 @@ class GongkaoUiHandler(BaseHTTPRequestHandler):
             result = _check_wechat_token()
             _json_response(self, result)
             return
+        if parsed.path == "/api/wechat/autoreply/diagnose":
+            from .wechat_ai_service import diagnose_autoreply_conflict
+            report = diagnose_autoreply_conflict(our_ai_enabled=True)
+            _json_response(self, {"ok": True, "diagnosis": report})
+            return
         if parsed.path == "/api/task":
             task_id = (parse_qs(parsed.query).get("id") or [""])[0]
             task = _get_task(task_id)

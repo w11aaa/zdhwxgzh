@@ -190,6 +190,160 @@ def _text_response(handler: BaseHTTPRequestHandler, text: str, content_type: str
 
 
 # ═══════════════════════════════════════════════════════════════
+# 获取公众号自动回复规则（调试诊断用）
+# ═══════════════════════════════════════════════════════════════
+
+
+def get_autoreply_rules(access_token: str = "") -> dict:
+    """调用微信 API 获取公众号当前自动回复规则。
+
+    接口: GET /cgi-bin/get_current_autoreply_info
+    返回: 关注后自动回复、消息自动回复、关键词自动回复的完整配置。
+
+    Args:
+        access_token: 微信公众号 access_token。为空则自动获取。
+
+    Returns:
+        解析后的自动回复规则，失败时返回 {"error": "..."}
+    """
+    from urllib.request import Request, urlopen, HTTPError, URLError
+
+    if not access_token:
+        token_result = _get_access_token()
+        access_token = token_result.get("access_token", "")
+        if not access_token:
+            return {"error": token_result.get("error", "无法获取 access_token")}
+
+    url = f"https://api.weixin.qq.com/cgi-bin/get_current_autoreply_info?access_token={access_token}"
+
+    try:
+        with urlopen(url, timeout=15) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+        if "errcode" in data and data.get("errcode") != 0:
+            return {"error": f"微信 API 错误: errcode={data.get('errcode')} {data.get('errmsg','')}"}
+        return data
+    except HTTPError as e:
+        body = e.read().decode("utf-8", errors="replace")[:500]
+        return {"error": f"HTTP {e.code}: {body}"}
+    except URLError as e:
+        return {"error": f"网络错误: {e}"}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+def diagnose_autoreply_conflict(our_ai_enabled: bool = True) -> dict:
+    """诊断微信公众号自动回复与 AI 客服的冲突情况。
+
+    如果公众号后台开启了「消息自动回复」且我们也在回调里回复，
+    会冲突（微信只选一个回复）。
+
+    Returns:
+        诊断报告 dict
+    """
+    import json as _json
+
+    result = {
+        "our_ai_enabled": our_ai_enabled,
+        "conflicts": [],
+        "suggestions": [],
+        "wechat_rules": None,
+        "status": "unknown",
+    }
+
+    rules = get_autoreply_rules()
+    result["wechat_rules"] = rules
+
+    if "error" in rules:
+        result["status"] = "error"
+        result["suggestions"].append(
+            f"无法获取微信自动回复规则: {rules['error']}。")
+        result["suggestions"].append(
+            "请检查公众号 AppSecret 是否配置正确，以及 IP 白名单是否包含当前服务器。")
+        return result
+
+    # 检查消息自动回复
+    is_msg_open = rules.get("is_autoreply_open", 0)
+    msg_default = rules.get("message_default_autoreply_info") or {}
+
+    # 检查关注后自动回复
+    is_follow_open = rules.get("is_add_friend_reply_open", 0)
+    follow_info = rules.get("add_friend_autoreply_info") or {}
+
+    # 检查关键词自动回复
+    keyword_info = rules.get("keyword_autoreply_info") or {}
+    keyword_list = keyword_info.get("list", [])
+
+    if our_ai_enabled and is_msg_open == 1:
+        result["conflicts"].append({
+            "type": "message_autoreply",
+            "detail": f"公众号后台开启了消息自动回复，"
+                      f"当前回复内容: {msg_default.get('content', '(非文本)')[:50]}",
+            "impact": "用户发消息时会由微信后台自动回复，我们的 AI 客服消息不会生效",
+        })
+
+    if is_msg_open == 0:
+        result["suggestions"].append("消息自动回复未开启，自定义 AI 客服消息不受影响。")
+
+    if is_follow_open == 1:
+        follow_content = follow_info.get("content", "(非文本)")
+        result["suggestions"].append(
+            f"关注后自动回复已开启: {str(follow_content)[:50]}。如果需要自定义欢迎语，"
+            f"可以保留此项，关注事件会触发回调，我们也能回复。"
+        )
+
+    if keyword_list:
+        rules_summary = []
+        for kw_rule in keyword_list:
+            rule_name = kw_rule.get("rule_name", "")
+            keywords = [
+                k.get("content", "") for k in kw_rule.get("keyword_list_info", [])
+            ]
+            rules_summary.append(f"{rule_name}: {'/'.join(keywords[:5])}")
+        result["suggestions"].append(
+            f"检测到 {len(keyword_list)} 条关键词自动回复规则: {', '.join(rules_summary)}。"
+            f"这些规则会优先于我们的 AI 消息回调，关键词匹配时会直接触发微信内置回复。"
+        )
+
+    # 最终判断
+    if result["conflicts"]:
+        result["status"] = "conflict"
+        result["suggestions"].insert(0,
+            "建议: 在公众号后台「内容与互动 → 自动回复」中关闭「消息自动回复」，"
+            "让我们的 AI 客服接管所有消息。关键词自动回复如果有用可以保留。")
+    else:
+        result["status"] = "ok"
+        result["suggestions"].insert(0, "未检测到冲突。AI 客服可以正常接管消息。")
+
+    return result
+
+
+def _get_access_token() -> dict:
+    """获取微信公众号 access_token。"""
+    from pathlib import Path as _Path
+    import json as _json
+
+    config_path = _Path.home() / ".wechat-publisher" / "config.json"
+    if not config_path.exists():
+        return {"error": f"未找到微信配置: {config_path}"}
+    try:
+        cfg = _json.loads(config_path.read_text(encoding="utf-8"))
+        appid = str(cfg.get("appid") or "")
+        secret = str(cfg.get("appsecret") or "")
+        url = (
+            "https://api.weixin.qq.com/cgi-bin/token?"
+            f"grant_type=client_credential&appid={appid}&secret={secret}"
+        )
+        from urllib.request import urlopen
+        with urlopen(url, timeout=15) as resp:
+            return _json.loads(resp.read().decode("utf-8"))
+    except Exception as e:
+        return {"error": str(e)}
+
+
+import json  # noqa (for module-level use above)
+
+
+# ═══════════════════════════════════════════════════════════════
 # 本地测试（模拟微信服务器请求）
 # ═══════════════════════════════════════════════════════════════
 
