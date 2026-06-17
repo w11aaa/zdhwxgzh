@@ -189,6 +189,7 @@ class KnowledgeGraphEngine:
             self._upsert_edge(conn, e[0], e[1], e[2], e[3], e[4], e[5])
         stats["similarity_edges"] = len(sim_edges)
 
+        conn.commit()
         return {"status": "built", **stats}
 
     # ── Query ────────────────────────────────────────────
