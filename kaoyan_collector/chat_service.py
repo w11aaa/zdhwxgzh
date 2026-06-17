@@ -60,8 +60,8 @@ def generate_chat_stream(message: str, session_id: str = "") -> Generator[str, N
     # Step 2: Try KG recommendations
     kg_recs = []
     try:
-        from .kg_engine import KnowledgeGraph
-        kg = KnowledgeGraph()
+        from .kg_engine import KnowledgeGraphEngine
+        kg = KnowledgeGraphEngine()
         kg_recs = kg.recommend_related(msg)
         if kg_recs:
             yield sse_event("tool_call", {"tool": "kg_recommend", "count": len(kg_recs)})

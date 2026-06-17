@@ -270,6 +270,15 @@ class KnowledgeGraphEngine:
         return {"total_nodes": nodes, "total_edges": edges,
                 "nodes_by_type": by_type, "edges_by_relation": by_rel}
 
+    def recommend_related(self, query: str, limit: int = 5) -> list[dict]:
+        """根据查询关键词推荐相关实体。"""
+        entities = self.search_entities(query, limit=limit)
+        results = []
+        for e in entities:
+            results.append({"title": e["label"], "type": e["type"],
+                           "reason": f"matched keyword: {query}"})
+        return results
+
     # ── Internal ─────────────────────────────────────────
 
     def _upsert_node(self, conn, node_id, node_type, label, props, now):
