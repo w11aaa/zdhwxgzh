@@ -1605,6 +1605,7 @@ def _home_html() -> str:
     </div>
     <div class="actions" style="margin:0;">
       <a href="/events"><button class="secondary">打开公告库</button></a>
+      <a href="/chat"><button class="secondary" style="background:#2563eb;color:#fff">💬 AI 对话</button></a>
       <a href="/dashboard"><button class="secondary">Dashboard</button></a>
       <a href="/agent/runs"><button class="secondary">Agent 运行记录</button></a>
       <a href="/agent/tools"><button class="secondary">Agent 工具</button></a>
@@ -2262,7 +2263,20 @@ async function send(){
         if(!line.startsWith('data: ')) continue;
         try{
           const data = JSON.parse(line.slice(6));
-          if(data.type==='thinking'||data.type==='tool_call'){
+          if(data.type==='step'){
+            const h = '<div style="display:flex;align-items:center;gap:6px;margin:4px 0">'+
+              '<span style="flex-shrink:0;font-size:16px">'+data.icon+'</span>'+
+              '<div><b style="font-size:13px;color:#93c5fd">'+escapeHtml(data.title)+'</b>'+
+              '<div style="font-size:12px;color:#9ca3af">'+escapeHtml(data.detail)+'</div></div></div>';
+            addMsg('system',h);
+          }else if(data.type==='decision'){
+            addMsg('system','<div style="font-size:12px;color:#d1d5db;padding:2px 8px;background:#1e3a5f;border-radius:8px;display:inline-block">'+data.icon+' '+escapeHtml(data.text)+'</div>');
+          }else if(data.type==='tool_result'){
+            let hh = '';
+            if(data.hits) hh = '<div style="font-size:11px;color:#9ca3af;margin-top:4px">'+
+              data.hits.map(x=>'<span style="background:#1e40af;color:#93c5fd;padding:1px 6px;border-radius:6px;margin:2px;display:inline-block">'+escapeHtml(x)+'</span>').join('')+'</div>';
+            addMsg('system','<div style="font-size:12px;color:#86efac">'+'\u2714 '+data.tool+' success, '+data.count+' results'+hh+'</div>');
+          }else if(data.type==='reply'){
             addMsg('system','<span class="tool-badge">'+escapeHtml(data.content||(data.tool+' results:'+data.count))+'</span>');
           }else if(data.type==='reply'){
             fullReply = data.content;
