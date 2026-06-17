@@ -69,3 +69,10 @@ htmlcov/
 
 # Playwright
 .playwright/
+
+# Ngrok
+ngrok.exe
+ngrok.zip
+
+# RAG index (large binary, rebuild locally)
+kaoyan_collector/data/rag_index/

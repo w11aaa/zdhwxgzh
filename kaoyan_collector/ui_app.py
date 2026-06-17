@@ -2148,6 +2148,151 @@ def _handle_wechat_callback_post(handler):
         handler.wfile.write(b"success")
 
 
+def _handle_chat_stream(handler, params):
+    """SSE streaming chat endpoint."""
+    from .chat_service import generate_chat_stream
+    msg = (params.get("message") or [""])[0]
+    sid = (params.get("session") or ["default"])[0]
+    handler.send_response(200)
+    handler.send_header("Content-Type", "text/event-stream")
+    handler.send_header("Cache-Control", "no-cache")
+    handler.send_header("Connection", "keep-alive")
+    handler.send_header("Access-Control-Allow-Origin", "*")
+    handler.end_headers()
+    try:
+        for event in generate_chat_stream(msg, sid):
+            handler.wfile.write(event.encode("utf-8"))
+            handler.wfile.flush()
+    except Exception as e:
+        handler.wfile.write(f'data: {{"type":"error","content":"{e}"}}\n\n'.encode())
+
+
+def _chat_page_html() -> str:
+    return r'''<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI Chat - Gongkao Agent</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:"Microsoft YaHei",sans-serif;background:#111827;color:#e5e7eb;height:100vh;display:flex;flex-direction:column}
+header{background:#1f2937;padding:12px 20px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #374151}
+header h1{font-size:18px;color:#f9fafb}
+header a,header button{color:#60a5fa;text-decoration:none;font-size:14px;background:none;border:none;cursor:pointer}
+.chat-container{flex:1;overflow-y:auto;padding:16px 20px;display:flex;flex-direction:column;gap:12px}
+.message{max-width:85%;padding:10px 14px;border-radius:12px;line-height:1.6;font-size:14px;white-space:pre-wrap;word-break:break-word;animation:fadeIn .3s}
+.message.user{align-self:flex-end;background:#2563eb;color:#fff;border-bottom-right-radius:4px}
+.message.assistant{align-self:flex-start;background:#374151;color:#e5e7eb;border-bottom-left-radius:4px}
+.message.system{align-self:center;background:transparent;color:#9ca3af;font-size:12px;padding:4px 8px}
+.input-area{background:#1f2937;padding:12px 20px;display:flex;gap:8px;border-top:1px solid #374151}
+.input-area input{flex:1;padding:10px 14px;border-radius:20px;border:1px solid #4b5563;background:#374151;color:#f9fafb;font-size:14px;outline:none}
+.input-area input:focus{border-color:#60a5fa}
+.input-area button{padding:10px 20px;border-radius:20px;border:none;background:#2563eb;color:#fff;cursor:pointer;font-weight:600;font-size:14px}
+.input-area button:hover{background:#1d4ed8}
+.input-area button:disabled{opacity:.5;cursor:wait}
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.tool-badge{display:inline-block;background:#1e40af;color:#93c5fd;padding:2px 8px;border-radius:10px;font-size:11px;margin:4px 2px}
+.loading{display:inline-block;width:8px;height:8px;border-radius:50%;background:#9ca3af;animation:bounce 1.4s infinite;margin:0 2px}
+.loading:nth-child(2){animation-delay:.2s}.loading:nth-child(3){animation-delay:.4s}
+@keyframes bounce{0%,80%,100%{transform:scale(0)}40%{transform:scale(1)}}
+</style>
+</head>
+<body>
+<header>
+  <h1>AI Chat</h1>
+  <div>
+    <a href="/">Dashboard</a> |
+    <a href="/dashboard">Stats</a> |
+    <button onclick="newSession()" style="color:#60a5fa;cursor:pointer;font-size:14px">New Chat</button>
+  </div>
+</header>
+<div class="chat-container" id="chat"></div>
+<div class="input-area">
+  <input id="input" placeholder="Ask about gongkao..." onkeydown="if(event.key==='Enter')send()" autofocus>
+  <button id="sendBtn" onclick="send()">Send</button>
+</div>
+<script>
+let sessionId = localStorage.getItem('chat_session') || ('s'+Date.now());
+localStorage.setItem('chat_session', sessionId);
+let isStreaming = false;
+
+function newSession(){
+  sessionId = 's'+Date.now();
+  localStorage.setItem('chat_session', sessionId);
+  document.getElementById('chat').innerHTML = '';
+  addMsg('system','New conversation');
+}
+
+function addMsg(role, content, streaming){
+  const chat = document.getElementById('chat');
+  let el = chat.querySelector('.msg-streaming');
+  if(streaming && el){el.innerHTML=content;chat.scrollTop=chat.scrollHeight;return el}
+  el = document.createElement('div');
+  el.className = 'message '+role+(streaming?' msg-streaming':'');
+  el.innerHTML = content;
+  chat.appendChild(el);
+  chat.scrollTop = chat.scrollHeight;
+  return el;
+}
+
+async function send(){
+  if(isStreaming) return;
+  const input = document.getElementById('input');
+  const msg = input.value.trim();
+  if(!msg) return;
+  input.value = ''; input.disabled = true;
+  document.getElementById('sendBtn').disabled = true;
+  isStreaming = true;
+
+  addMsg('user', escapeHtml(msg));
+  const adiv = addMsg('assistant', '<span class="loading"></span><span class="loading"></span><span class="loading"></span>', true);
+  let fullReply = '';
+
+  try{
+    const resp = await fetch('/api/chat/stream?message='+encodeURIComponent(msg)+'&session='+sessionId);
+    const reader = resp.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    while(true){
+      const {done, value} = await reader.read();
+      if(done) break;
+      buffer += decoder.decode(value, {stream:true});
+      const lines = buffer.split('\\n');
+      buffer = lines.pop() || '';
+      for(const line of lines){
+        if(!line.startsWith('data: ')) continue;
+        try{
+          const data = JSON.parse(line.slice(6));
+          if(data.type==='thinking'||data.type==='tool_call'){
+            addMsg('system','<span class="tool-badge">'+escapeHtml(data.content||(data.tool+' results:'+data.count))+'</span>');
+          }else if(data.type==='reply'){
+            fullReply = data.content;
+            adiv.innerHTML = escapeHtml(fullReply);
+            adiv.classList.remove('msg-streaming');
+          }else if(data.type==='done'){
+            adiv.classList.remove('msg-streaming');
+            if(!fullReply) adiv.innerHTML = 'No response. Try asking about exam types or regions.';
+          }
+        }catch(e){}
+      }
+    }
+  }catch(e){
+    adiv.innerHTML = 'Network error: '+escapeHtml(e.message);
+    adiv.classList.remove('msg-streaming');
+  }
+
+  input.disabled = false;
+  document.getElementById('sendBtn').disabled = false;
+  isStreaming = false;
+  input.focus();
+}
+
+function escapeHtml(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+</script>
+</body>
+</html>'''
+
+
 class GongkaoUiHandler(BaseHTTPRequestHandler):
     server_version = "GongkaoUi/0.1"
 
@@ -2170,6 +2315,12 @@ class GongkaoUiHandler(BaseHTTPRequestHandler):
             return
         if parsed.path == "/agent/tools":
             _text_response(self, _agent_tools_page_html())
+            return
+        if parsed.path == "/chat":
+            _text_response(self, _chat_page_html())
+            return
+        if parsed.path.startswith("/api/chat/stream"):
+            _handle_chat_stream(self, parse_qs(parsed.query))
             return
         if parsed.path == "/wechat/callback":
             _handle_wechat_callback_get(self, parse_qs(parsed.query))
