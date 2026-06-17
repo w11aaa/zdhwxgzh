@@ -2096,14 +2096,13 @@ refreshAll().catch(err => log("初始化失败：" + err.message));
 
 def _handle_wechat_callback_get(handler, params):
     """微信服务器配置验证（GET 请求）。"""
-    from .wechat_ai_service import verify_signature, WECHAT_TOKEN
-    from urllib.parse import parse_qs
+    from .wechat_ai_service import verify_signature
     signature = (params.get("signature") or [""])[0]
     timestamp = (params.get("timestamp") or [""])[0]
     nonce = (params.get("nonce") or [""])[0]
     echostr = (params.get("echostr") or [""])[0]
 
-    if verify_signature(signature, timestamp, nonce, WECHAT_TOKEN):
+    if verify_signature(signature, timestamp, nonce):
         print(f"[wechat] 签名验证成功", flush=True)
         _text_response(handler, echostr, content_type="text/plain; charset=utf-8")
     else:
